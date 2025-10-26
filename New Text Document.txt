@@ -1,0 +1,4 @@
+Dwonload all the file and create folder " Netwrok " in this folder past all the files !
+
+run cmd for create python vnev 
+cmd are in file.
