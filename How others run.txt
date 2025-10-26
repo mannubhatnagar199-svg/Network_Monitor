@@ -1,0 +1,31 @@
+python -m venv myenv
+myenv\\Scripts\\activate 
+pip install pandas openpyxl waitress flask
+
+How others run it:
+
+Unzip or clone the folder.
+
+{ (If needed) create and activate a virtual environment.
+
+python -m venv myenv
+myenv\\Scripts\\activate 
+ 
+ }
+
+Run pip install -r requirements.txt to install packages.
+
+Run the start script (start.bat on Windows or ./start.sh on Linux/macOS)
+
+for linux 
+
+sudo apt update
+sudo apt install python3-venv python3-pip -y
+
+python3 -m venv venv
+
+source venv/bin/activate
+
+pip install -r requirements.txt
+
+python app.py

@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <title>Device Dashboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+
+    <!-- Google Fonts Poppins -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins&display=swap" rel="stylesheet" />
+
+    <!-- jQuery -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+    <style>
+        body {
+            font-family: "Poppins", Arial, sans-serif;
+            padding: 20px;
+            background-color: #f8f9fa;
+        }
+
+        h1 {
+            margin-bottom: 25px;
+            font-weight: 600;
+            color: #343a40;
+        }
+
+        .badge-online {
+            background-color: #198754;
+        }
+
+        .badge-offline {
+            background-color: #dc3545;
+        }
+
+        .badge-checking {
+            background-color: #fd7e14;
+        }
+
+        .table-responsive {
+            max-height: 550px;
+            overflow-y: auto;
+        }
+
+        .card-summary {
+            background-color: #ffffff;
+            padding: 15px;
+            margin-bottom: 25px;
+            border-radius: 0.5rem;
+            box-shadow: 0 0.125rem 0.25rem rgb(0 0 0 / 0.075);
+        }
+
+        .filter-input,
+        .filter-select {
+            max-width: 180px;
+        }
+
+        .btn-downloads button {
+            margin-right: 5px;
+        }
+
+        /* Event Manager styles */
+        #event-manager {
+            background: #fff;
+            padding: 15px;
+            border-radius: 0.5rem;
+            margin-top: 25px;
+            box-shadow: 0 0.125rem 0.25rem rgb(0 0 0 / 0.1);
+        }
+
+        #event-manager h3 {
+            margin-bottom: 15px;
+        }
+
+        #event-list {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>Device Dashboard</h1>
+
+    <!-- Summary cards -->
+    <div class="row mb-4">
+        <div class="col-sm-4">
+            <div class="card-summary text-center text-success">
+                <h5>Online</h5>
+                <span id="summary-online">0</span>
+            </div>
+        </div>
+        <div class="col-sm-4">
+            <div class="card-summary text-center text-danger">
+                <h5>Offline</h5>
+                <span id="summary-offline">0</span>
+            </div>
+        </div>
+        <div class="col-sm-4">
+            <div class="card-summary text-center text-warning">
+                <h5>Checking...</h5>
+                <span id="summary-checking">0</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="mb-3 d-flex flex-wrap gap-3">
+        <input id="searchDevices" class="form-control filter-input" placeholder="Search by name or IP" />
+        <select id="filterCategory" class="form-select filter-select">
+            <option value="">All Categories</option>
+        </select>
+        <select id="filterStatus" class="form-select filter-select">
+            <option value="">All Statuses</option>
+            <option value="Online">Online</option>
+            <option value="Offline">Offline</option>
+            <option value="Checking...">Checking...</option>
+        </select>
+        <button id="btnImportCSV" class="btn btn-primary">Import CSV</button>
+        <button id="btnExportCSV" class="btn btn-outline-secondary">Export CSV</button>
+        <button id="btnExportExcel" class="btn btn-outline-secondary">Export Excel</button>
+    </div>
+
+    <!-- Device table -->
+    <div class="table-responsive">
+        <table class="table table-bordered table-hover" id="deviceTable">
+            <thead class="table-light">
+                <tr>
+                    <th>Name</th>
+                    <th>IP</th>
+                    <th>Category</th>
+                    <th>Status</th>
+                    <th>Last Checked</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+
+    <!-- Event Manager -->
+    <div id="event-manager">
+        <h3>Recent Offline Events</h3>
+        <div id="event-list">
+            <table class="table table-sm table-bordered">
+                <thead class="table-light">
+                    <tr>
+                        <th>Device Name</th>
+                        <th>IP</th>
+                        <th>Timestamp</th>
+                    </tr>
+                </thead>
+                <tbody id="eventsTbody">
+                    <tr><td colspan="3" class="text-center">Loading...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Modals and other HTML unchanged from your original UI, implement them as needed -->
+
+    <script>
+    $(document).ready(function() {
+        let devices = [];
+
+        function renderDevices() {
+            const search = $("#searchDevices").val().toLowerCase();
+            const catFilter = $("#filterCategory").val();
+            const statusFilter = $("#filterStatus").val();
+
+            const tbody = $("#deviceTable tbody");
+            tbody.empty();
+
+            // Populate category dropdown dynamically
+            const categoriesSet = new Set(devices.map(d => d.category));
+            const categorySelect = $("#filterCategory");
+            let currentOptions = Array.from(categorySelect.find("option")).map(opt => opt.value);
+            let updated = false;
+            categoriesSet.forEach(cat => {
+                if (!currentOptions.includes(cat)) {
+                    categorySelect.append(`<option value="${cat}">${cat}</option>`);
+                    updated = true;
+                }
+            });
+
+            devices.forEach(device => {
+                if (search && !(device.name.toLowerCase().includes(search) || device.ip.includes(search))) return;
+                if (catFilter && device.category !== catFilter) return;
+                if (statusFilter && device.status !== statusFilter) return;
+
+                const statusBadgeClass = device.status === "Online" ? "badge-online" :
+                                         device.status === "Offline" ? "badge-offline" :
+                                         "badge-checking";
+
+                const row = $(`
+                    <tr>
+                    <td>${device.name}</td>
+                    <td>${device.ip}</td>
+                    <td>${device.category}</td>
+                    <td><span class="badge ${statusBadgeClass}">${device.status}</span></td>
+                    <td>${device.last_checked}</td>
+                    <td>
+                        <button class="btn btn-sm btn-primary btn-edit" data-ip="${device.ip}">Edit</button>
+                        <button class="btn btn-sm btn-danger btn-delete" data-ip="${device.ip}">Delete</button>
+                    </td>
+                    </tr>
+                `);
+                tbody.append(row);
+            });
+        }
+
+        function updateSummary(summary) {
+            $("#summary-online").text(summary.online);
+            $("#summary-offline").text(summary.offline);
+            $("#summary-checking").text(summary.checking);
+        }
+
+        function fetchStatus() {
+            $.getJSON("/status", function(data) {
+                devices = data.devices;
+                updateSummary(data.overall);
+                renderDevices();
+            });
+        }
+
+        // Event Manager fetching
+        function fetchRecentEvents() {
+            $.getJSON("/events/recent", function(data) {
+                const tbody = $("#eventsTbody");
+                tbody.empty();
+                if (!data.events || data.events.length === 0) {
+                    tbody.append("<tr><td colspan='3' class='text-center'>No recent offline events.</td></tr>");
+                    return;
+                }
+                for (const event of data.events) {
+                    const row = $(`
+                        <tr>
+                            <td>${event.name}</td>
+                            <td>${event.ip}</td>
+                            <td>${new Date(event.changed_at).toLocaleString()}</td>
+                        </tr>
+                    `);
+                    tbody.append(row);
+                }
+            }).fail(function() {
+                $("#eventsTbody").html("<tr><td colspan='3' class='text-center text-danger'>Failed to load events.</td></tr>");
+            });
+        }
+
+        // Initial load
+        fetchStatus();
+        fetchRecentEvents();
+
+        // Polling every 30 seconds
+        setInterval(fetchStatus, 30000);
+        setInterval(fetchRecentEvents, 30000);
+
+        // Filters and search triggers
+        $("#searchDevices, #filterCategory, #filterStatus").on("input change", function() {
+            renderDevices();
+        });
+
+        // Button placeholders - Implement modals and backend connections as needed
+        $("#btnImportCSV").click(function() {
+            alert("Implement CSV import modal logic.");
+        });
+        $("#btnExportCSV").click(function() {
+            window.location.href = "/devices/export";
+        });
+        $("#btnExportExcel").click(function() {
+            window.location.href = "/devices/export_excel";
+        });
+
+        // Event delegation for edit and delete since rows change
+        $("#deviceTable tbody").on("click", ".btn-edit", function() {
+            const ip = $(this).data("ip");
+            alert(`Edit device with IP: ${ip} (Implement modal)`);
+        });
+
+        $("#deviceTable tbody").on("click", ".btn-delete", function() {
+            const ip = $(this).data("ip");
+            if (confirm(`Are you sure you want to delete device with IP: ${ip}?`)) {
+                $.ajax({
+                    url: `/devices/delete_by_ip/${ip}`,
+                    type: "POST",
+                    success: function() {
+                        alert("Device deleted.");
+                        fetchStatus();
+                    },
+                    error: function() {
+                        alert("Failed to delete device.");
+                    }
+                });
+            }
+        });
+    });
+    </script>
+</body>
+</html>
