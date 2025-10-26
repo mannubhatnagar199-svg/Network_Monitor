@@ -1,0 +1,937 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Device Dashboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- Google Fonts Poppins -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins&display=swap" rel="stylesheet">
+    
+    <!-- jQuery -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+    <style>
+        body {
+        font-family: 'Poppins', Arial, sans-serif;
+        padding: 20px;
+        background-color: #f8f9fa;
+        min-height: 100vh;
+        background-size: cover;
+        background-position: center;
+        background-attachment: fixed;
+        position: relative;
+    }
+    
+    /* Add overlay for better readability */
+    body::before {
+        content: '';
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(255, 255, 255, 0.1);
+        z-index: -1;
+        pointer-events: none;
+    }
+        h1 {
+            margin-bottom: 25px;
+            font-weight: 600;
+            color: #343a40;
+        }
+        .badge-online {
+            background-color: #198754;
+        }
+        .badge-offline {
+            background-color: #dc3545;
+        }
+        .badge-checking {
+            background-color: #fd7e14;
+        }
+        .table-responsive {
+            max-height: 550px;
+            overflow-y: auto;
+        }
+        .card-summary {
+            background-color: #ffffff;
+            padding: 15px;
+            margin-bottom: 25px;
+            border-radius: 0.5rem;
+            box-shadow: 0 0.125rem 0.25rem rgba(0,0,0,0.075);
+        }
+        .card-category {
+            background-color: #ffffff;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 0.5rem;
+            box-shadow: 0 0.125rem 0.25rem rgba(0,0,0,0.075);
+            border-left: 4px solid #0d6efd;
+        }
+        .filter-input,
+        .filter-select {
+            max-width: 180px;
+        }
+        .btn-downloads button {
+            margin-right: 5px;
+        }
+        .card-events {
+            background-color: #ffffff;
+            padding: 15px;
+            margin-bottom: 25px;
+            border-radius: 0.5rem;
+            box-shadow: 0 0.125rem 0.25rem rgba(0,0,0,0.075);
+        }
+        #eventsTbody {
+            font-size: 0.95rem;
+        }
+        .category-stat {
+            display: inline-block;
+            margin-right: 15px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Device Dashboard</h1>
+
+    <!-- Overall Summary Cards -->
+    <div class="row mb-4">
+        <div class="col-sm-4">
+            <div class="card-summary text-center text-success">
+                <h5>Online</h5>
+                <span id="summary-online" class="fs-2">0</span>
+            </div>
+        </div>
+        <div class="col-sm-4">
+            <div class="card-summary text-center text-danger">
+                <h5>Offline</h5>
+                <span id="summary-offline" class="fs-2">0</span>
+            </div>
+        </div>
+        <div class="col-sm-4">
+            <div class="card-summary text-center text-warning">
+                <h5>Checking...</h5>
+                <span id="summary-checking" class="fs-2">0</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Category-wise Summary Cards -->
+    <div id="categorySummary" class="mb-4">
+        <h5 class="mb-3">Category Summary</h5>
+        <div class="row" id="categoryCards">
+        </div>
+    </div>
+    <!-- Event Manager Card -->
+    <div class="card-events mt-4">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="mb-0">Recent Offline Events</h5>
+            <button id="btnRefreshEvents" class="btn btn-sm btn-outline-secondary">Refresh</button>
+        </div>
+        <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
+            <table class="table table-sm table-bordered">
+                <thead class="table-light">
+                    <tr>
+                        <th>Device Name</th>
+                        <th>IP</th>
+                        <th>Timestamp</th>
+                    </tr>
+                </thead>
+                <tbody id="eventsTbody">
+                    <tr><td colspan="3" class="text-center">Loading...</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <small class="text-muted">Showing last 10 devices that went offline</small>
+    </div>
+    <!-- Filters and Actions -->
+<div class="mb-3 d-flex flex-wrap gap-2">
+    <input id="searchDevices" class="form-control filter-input" placeholder="Search by name or IP">
+    <select id="filterCategory" class="form-select filter-select">
+        <option value="">All Categories</option>
+    </select>
+    <select id="filterStatus" class="form-select filter-select">
+        <option value="">All Statuses</option>
+        <option value="Online">Online</option>
+        <option value="Offline">Offline</option>
+        <option value="Checking...">Checking...</option>
+    </select>
+    <button id="btnAddDevice" class="btn btn-success">➕ Add Device</button>
+    <button id="btnImportCSV" class="btn btn-primary">📁 Import CSV</button>
+    
+    <!-- Download dropdown -->
+<div class="btn-group">
+    <button type="button" class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
+        📥 Download
+    </button>
+    <ul class="dropdown-menu">
+        <li><button class="dropdown-item" id="btnExportCSV" type="button">CSV (All Devices)</button></li>
+        <li><button class="dropdown-item" id="btnExportExcel" type="button">Excel (All Devices)</button></li>
+        <li><hr class="dropdown-divider"></li>
+        <li><button class="dropdown-item" id="btnExportExcelOnline" type="button">📗 Excel (Online Only)</button></li>
+        <li><button class="dropdown-item" id="btnExportExcelOffline" type="button">📕 Excel (Offline Only)</button></li>
+    </ul>
+</div>
+
+    
+    <button id="btnEmailConfig" class="btn btn-outline-info">⚙️ Email Config</button>
+    <button id="btnBackgroundSettings" class="btn btn-outline-secondary">🎨 Background</button>
+</div>
+
+
+    <!-- Device Table -->
+    <div class="table-responsive">
+        <table class="table table-bordered table-hover" id="deviceTable">
+            <thead class="table-light">
+                <tr>
+                    <th>Name</th>
+                    <th>IP</th>
+                    <th>Category</th>
+                    <th>Status</th>
+                    <th>Last Checked</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+            </tbody>
+        </table>
+    </div>
+
+    
+
+    <!-- Hidden file input for CSV import -->
+    <input type="file" id="csvFileInput" accept=".csv" style="display:none">
+
+    <!-- Add Device Modal -->
+    <div class="modal fade" id="addDeviceModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Add Device</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="addDeviceForm">
+                        <div class="mb-3">
+                            <label class="form-label">Device Name</label>
+                            <input type="text" class="form-control" id="addDeviceName" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">IP Address</label>
+                            <input type="text" class="form-control" id="addDeviceIP" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Category</label>
+                            <input type="text" class="form-control" id="addDeviceCategory" value="Default">
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="btnSaveDevice">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Device Modal -->
+    <div class="modal fade" id="editDeviceModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Edit Device</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="editDeviceForm">
+                        <input type="hidden" id="editDeviceId">
+                        <div class="mb-3">
+                            <label class="form-label">Device Name</label>
+                            <input type="text" class="form-control" id="editDeviceName" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">IP Address</label>
+                            <input type="text" class="form-control" id="editDeviceIP" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Category</label>
+                            <input type="text" class="form-control" id="editDeviceCategory">
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="btnUpdateDevice">Update</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Email Config Modal -->
+    <div class="modal fade" id="emailConfigModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Email Alert Configuration</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="emailConfigForm">
+                        <div class="mb-3 form-check">
+                            <input type="checkbox" class="form-check-input" id="emailEnabled">
+                            <label class="form-check-label" for="emailEnabled">Enable Email Alerts</label>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">SMTP Server</label>
+                            <input type="text" class="form-control" id="emailSmtpServer" placeholder="smtp.gmail.com">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">SMTP Port</label>
+                            <input type="number" class="form-control" id="emailSmtpPort" value="587">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Username</label>
+                            <input type="text" class="form-control" id="emailUsername" placeholder="your@email.com">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Password</label>
+                            <input type="password" class="form-control" id="emailPassword" placeholder="App password">
+                            <small class="text-muted">For Gmail, use App Password (Settings → Security → 2-Step Verification → App passwords)</small>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">From Email</label>
+                            <input type="email" class="form-control" id="emailFrom" placeholder="alerts@yourdomain.com">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">To Email</label>
+                            <input type="email" class="form-control" id="emailTo" placeholder="admin@yourdomain.com">
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="btnSaveEmailConfig">Save Configuration</button>
+                </div>
+            </div>
+        </div>
+    </div>
+	
+	<!-- Background Settings Modal -->
+<div class="modal fade" id="backgroundModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Background Settings</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="backgroundForm">
+                    <div class="mb-3">
+                        <label class="form-label">Background Type</label>
+                        <select class="form-select" id="bgType">
+                            <option value="color">Solid Color</option>
+                            <option value="image">Image</option>
+                            <option value="gradient">Gradient</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3" id="colorSection">
+                        <label class="form-label">Background Color</label>
+                        <input type="color" class="form-control form-control-color" id="bgColor" value="#f8f9fa">
+                    </div>
+                    
+                    <div class="mb-3 d-none" id="imageSection">
+                        <label class="form-label">Upload Image</label>
+                        <input type="file" class="form-control" id="bgImageFile" accept="image/*">
+                        <small class="text-muted">Or enter image URL:</small>
+                        <input type="text" class="form-control mt-2" id="bgImageUrl" placeholder="https://example.com/image.jpg">
+                    </div>
+                    
+                    <div class="mb-3 d-none" id="gradientSection">
+                        <label class="form-label">Gradient Colors</label>
+                        <div class="d-flex gap-2">
+                            <input type="color" class="form-control form-control-color" id="gradientColor1" value="#667eea">
+                            <input type="color" class="form-control form-control-color" id="gradientColor2" value="#764ba2">
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Opacity (for readability)</label>
+                        <input type="range" class="form-range" id="bgOpacity" min="0" max="1" step="0.1" value="0.1">
+                        <small class="text-muted">Overlay opacity: <span id="opacityValue">0.1</span></small>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <button type="button" class="btn btn-outline-secondary btn-sm" id="btnResetBg">Reset to Default</button>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="btnSaveBackground">Apply</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+    $(document).ready(function() {
+    let devices = [];
+    let categorySummary = {};
+    const API_BASE = "";
+
+    // IST Timestamp Formatter
+    function formatToIST(utcString) {
+        if (!utcString) return 'N/A';
+        
+        try {
+            const date = new Date(utcString);
+            
+            // Check if date is valid
+            if (isNaN(date.getTime())) {
+                return utcString; // Return original if invalid
+            }
+            
+            // Add IST offset (5 hours 30 minutes = 19800000 milliseconds)
+            const istTime = new Date(date.getTime() + (5.5 * 60 * 60 * 1000));
+            
+            const day = String(istTime.getUTCDate()).padStart(2, '0');
+            const month = String(istTime.getUTCMonth() + 1).padStart(2, '0');
+            const year = istTime.getUTCFullYear();
+            const hours = String(istTime.getUTCHours()).padStart(2, '0');
+            const minutes = String(istTime.getUTCMinutes()).padStart(2, '0');
+            const seconds = String(istTime.getUTCSeconds()).padStart(2, '0');
+            
+            return `${day}/${month}/${year} ${hours}:${minutes}:${seconds}`;
+        } catch (e) {
+            console.error("Error formatting timestamp:", e);
+            return utcString; // Return original on error
+        }
+    }
+
+    // Test the function (you can remove this later)
+    console.log("IST Formatter Test:", formatToIST("2025-10-07T15:45:51Z"));
+
+    function loadStatus() {
+        $.getJSON(API_BASE + "/status", function(data) {
+            devices = data.devices || [];
+            categorySummary = data.summary_by_category || {};
+            updateSummary(data.overall || {online:0, offline:0, checking:0});
+            renderCategorySummary();
+            renderDevices();
+        });
+    }
+
+    function updateSummary(summary) {
+        $("#summary-online").text(summary.online);
+        $("#summary-offline").text(summary.offline);
+        $("#summary-checking").text(summary.checking);
+    }
+
+    function renderCategorySummary() {
+        const container = $("#categoryCards");
+        container.empty();
+
+        if (Object.keys(categorySummary).length === 0) {
+            container.append('<div class="col-12"><p class="text-muted">No categories available</p></div>');
+            return;
+        }
+
+        Object.keys(categorySummary).forEach(category => {
+            const stats = categorySummary[category];
+            const total = (stats.Online || 0) + (stats.Offline || 0) + (stats['Checking...'] || 0);
+            
+            const card = $(`
+                <div class="col-md-4 col-lg-3">
+                    <div class="card-category">
+                        <h6 class="mb-2 fw-bold">${category}</h6>
+                        <div>
+                            <span class="category-stat">
+                                <strong>Total:</strong> ${total}
+                            </span>
+                        </div>
+                        <div>
+                            <span class="category-stat text-success">
+                                <strong>Online:</strong> ${stats.Online || 0}
+                            </span>
+                            <span class="category-stat text-danger">
+                                <strong>Offline:</strong> ${stats.Offline || 0}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            `);
+            container.append(card);
+        });
+    }
+
+    function renderDevices() {
+        const search = $("#searchDevices").val().toLowerCase();
+        const catFilter = $("#filterCategory").val();
+        const statusFilter = $("#filterStatus").val();
+
+        const tbody = $("#deviceTable tbody");
+        tbody.empty();
+
+        const categories = [...new Set(devices.map(d => d.category))];
+        const catSelect = $("#filterCategory");
+        const existingOptions = Array.from(catSelect.find("option")).map(o => o.value);
+        categories.forEach(cat => {
+            if (!existingOptions.includes(cat)) {
+                catSelect.append(`<option value="${cat}">${cat}</option>`);
+            }
+        });
+
+        devices.forEach(device => {
+            if (search && !(device.name.toLowerCase().includes(search) || device.ip.includes(search))) return;
+            if (catFilter && device.category !== catFilter) return;
+            if (statusFilter && device.status !== statusFilter) return;
+
+            const statusBadgeClass = device.status === "Online" ? "badge-online" :
+                                     device.status === "Offline" ? "badge-offline" : "badge-checking";
+
+            // *** IMPORTANT: Format timestamp to IST ***
+            const formattedTime = formatToIST(device.last_checked);
+
+            const row = $(`
+                <tr>
+                    <td>${device.name}</td>
+                    <td>${device.ip}</td>
+                    <td>${device.category}</td>
+                    <td><span class="badge ${statusBadgeClass}">${device.status}</span></td>
+                    <td>${formattedTime}</td>
+                    <td>
+                        <button class="btn btn-sm btn-primary btn-edit" data-name="${device.name}" data-ip="${device.ip}" data-category="${device.category}">Edit</button>
+                        <button class="btn btn-sm btn-danger btn-delete" data-ip="${device.ip}">Delete</button>
+                    </td>
+                </tr>
+            `);
+            tbody.append(row);
+        });
+    }
+
+    function loadEvents() {
+        $.getJSON(API_BASE + "/events/recent", function(data) {
+            const tbody = $("#eventsTbody");
+            tbody.empty();
+            if (!data.events || data.events.length === 0) {
+                tbody.append("<tr><td colspan='3' class='text-center'>No recent offline events.</td></tr>");
+                return;
+            }
+            data.events.forEach(event => {
+                // *** IMPORTANT: Format timestamp to IST ***
+                const formattedTime = formatToIST(event.changed_at);
+                tbody.append(`
+                    <tr>
+                        <td>${event.name}</td>
+                        <td>${event.ip}</td>
+                        <td>${formattedTime}</td>
+                    </tr>
+                `);
+            });
+        }).fail(function() {
+            $("#eventsTbody").html("<tr><td colspan='3' class='text-center text-danger'>Failed to load events.</td></tr>");
+        });
+    }
+
+    // Initial load
+    loadStatus();
+    loadEvents();
+
+    // Auto-refresh every 30 seconds
+    setInterval(loadStatus, 10000);
+    setInterval(loadEvents, 10000);
+
+    // Manual refresh events
+    $("#btnRefreshEvents").click(loadEvents);
+
+    // Filters
+    $("#searchDevices, #filterCategory, #filterStatus").on("input change", renderDevices);
+
+     
+		// Load and apply background on page load
+function loadBackground() {
+    $.getJSON(API_BASE + "/ui/background", function(config) {
+        applyBackground(config);
+    });
+}
+
+function applyBackground(config) {
+    const body = $("body");
+    const overlay = $("body::before");
+    
+    if (config.background_type === "color") {
+        body.css({
+            "background-color": config.background_color,
+            "background-image": "none"
+        });
+    } else if (config.background_type === "image" && config.background_image) {
+        body.css({
+            "background-image": `url('${config.background_image}')`,
+            "background-color": "transparent"
+        });
+    } else if (config.background_type === "gradient") {
+        // Parse gradient colors from image field (stored as JSON)
+        try {
+            const colors = JSON.parse(config.background_image);
+            body.css({
+                "background-image": `linear-gradient(135deg, ${colors[0]} 0%, ${colors[1]} 100%)`,
+                "background-color": "transparent"
+            });
+        } catch(e) {
+            body.css("background-color", "#f8f9fa");
+        }
+    }
+    
+    // Apply overlay opacity
+    const opacity = config.background_opacity || 0.1;
+    $("<style>")
+        .prop("type", "text/css")
+        .html(`body::before { background: rgba(255, 255, 255, ${opacity}) !important; }`)
+        .appendTo("head");
+}
+
+
+// Background settings modal
+$("#btnBackgroundSettings").click(function() {
+        $.getJSON(API_BASE + "/ui/background", function(config) {
+            $("#bgType").val(config.background_type || "color");
+            $("#bgColor").val(config.background_color || "#f8f9fa");
+            $("#bgOpacity").val(config.background_opacity || 0.1);
+            $("#opacityValue").text(config.background_opacity || 0.1);
+            toggleBackgroundSections(config.background_type);
+            new bootstrap.Modal($("#backgroundModal")).show();
+        });
+    });
+
+
+// Toggle sections based on type
+$("#bgType").change(function() {
+    toggleBackgroundSections($(this).val());
+});
+
+function toggleBackgroundSections(type) {
+    $("#colorSection, #imageSection, #gradientSection").addClass("d-none");
+    if (type === "color") {
+        $("#colorSection").removeClass("d-none");
+    } else if (type === "image") {
+        $("#imageSection").removeClass("d-none");
+    } else if (type === "gradient") {
+        $("#gradientSection").removeClass("d-none");
+    }
+}
+
+// Opacity slider
+$("#bgOpacity").on("input", function() {
+    $("#opacityValue").text($(this).val());
+});
+
+// Save background
+$("#btnSaveBackground").click(function() {
+    const type = $("#bgType").val();
+    let config = {
+        background_type: type,
+        background_color: $("#bgColor").val(),
+        background_opacity: parseFloat($("#bgOpacity").val())
+    };
+    
+    if (type === "color") {
+        config.background_image = null;
+        saveBackgroundConfig(config);
+    } else if (type === "gradient") {
+        const colors = [$("#gradientColor1").val(), $("#gradientColor2").val()];
+        config.background_image = JSON.stringify(colors);
+        saveBackgroundConfig(config);
+    } else if (type === "image") {
+        const file = $("#bgImageFile")[0].files[0];
+        const url = $("#bgImageUrl").val().trim();
+        
+        if (file) {
+            // Upload file
+            const formData = new FormData();
+            formData.append("file", file);
+            $.ajax({
+                url: API_BASE + "/ui/background/upload",
+                type: "POST",
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(res) {
+                    config.background_image = res.url;
+                    saveBackgroundConfig(config);
+                },
+                error: function() {
+                    alert("Failed to upload image");
+                }
+            });
+        } else if (url) {
+            config.background_image = url;
+            saveBackgroundConfig(config);
+        } else {
+            alert("Please select an image or enter a URL");
+        }
+    }
+});
+
+function saveBackgroundConfig(config) {
+    $.ajax({
+        url: API_BASE + "/ui/background",
+        type: "POST",
+        contentType: "application/json",
+        data: JSON.stringify(config),
+        success: function() {
+            applyBackground(config);
+            bootstrap.Modal.getInstance($("#backgroundModal")).hide();
+            alert("Background updated successfully!");
+        },
+        error: function() {
+            alert("Failed to save background settings");
+        }
+    });
+}
+
+// Reset background
+$("#btnResetBg").click(function() {
+    if (confirm("Reset to default background?")) {
+        const defaultConfig = {
+            background_type: "color",
+            background_color: "#f8f9fa",
+            background_image: null,
+            background_opacity: 0.1
+        };
+        saveBackgroundConfig(defaultConfig);
+    }
+});
+
+loadBackground();
+
+        // Add Device
+        $("#btnAddDevice").click(function() {
+            $("#addDeviceForm")[0].reset();
+            new bootstrap.Modal($("#addDeviceModal")).show();
+        });
+
+        $("#btnSaveDevice").click(function() {
+            const name = $("#addDeviceName").val().trim();
+            const ip = $("#addDeviceIP").val().trim();
+            const category = $("#addDeviceCategory").val().trim() || "Default";
+
+            if (!name || !ip) {
+                alert("Name and IP are required");
+                return;
+            }
+
+            $.ajax({
+                url: API_BASE + "/devices",
+                type: "POST",
+                contentType: "application/json",
+                data: JSON.stringify({name: name, ip: ip, category: category}),
+                success: function() {
+                    bootstrap.Modal.getInstance($("#addDeviceModal")).hide();
+                    loadStatus();
+                },
+                error: function(xhr) {
+                    const msg = xhr.responseJSON?.error || "Failed to add device";
+                    alert(msg);
+                }
+            });
+        });
+
+        // Edit Device
+        $("#deviceTable").on("click", ".btn-edit", function() {
+            const name = $(this).data("name");
+            const ip = $(this).data("ip");
+            const category = $(this).data("category");
+
+            $("#editDeviceName").val(name);
+            $("#editDeviceIP").val(ip);
+            $("#editDeviceCategory").val(category);
+            $("#editDeviceId").val(ip);
+
+            new bootstrap.Modal($("#editDeviceModal")).show();
+        });
+
+        $("#btnUpdateDevice").click(function() {
+            const oldIp = $("#editDeviceId").val();
+            const name = $("#editDeviceName").val().trim();
+            const ip = $("#editDeviceIP").val().trim();
+            const category = $("#editDeviceCategory").val().trim();
+
+            if (!name || !ip) {
+                alert("Name and IP are required");
+                return;
+            }
+
+            $.getJSON(API_BASE + "/devices", function(data) {
+                const dev = data.devices.find(d => d.ip === oldIp);
+                if (!dev) {
+                    alert("Device not found");
+                    return;
+                }
+
+                $.ajax({
+                    url: API_BASE + "/devices/" + dev.id,
+                    type: "PUT",
+                    contentType: "application/json",
+                    data: JSON.stringify({name: name, ip: ip, category: category}),
+                    success: function() {
+                        bootstrap.Modal.getInstance($("#editDeviceModal")).hide();
+                        loadStatus();
+                    },
+                    error: function(xhr) {
+                        const msg = xhr.responseJSON?.error || "Failed to update device";
+                        alert(msg);
+                    }
+                });
+            });
+        });
+
+        // Delete Device
+        $("#deviceTable").on("click", ".btn-delete", function() {
+            const ip = $(this).data("ip");
+            if (!confirm(`Delete device with IP ${ip}?`)) return;
+
+            $.getJSON(API_BASE + "/devices", function(data) {
+                const dev = data.devices.find(d => d.ip === ip);
+                if (!dev) {
+                    alert("Device not found");
+                    return;
+                }
+
+                $.ajax({
+                    url: API_BASE + "/devices/" + dev.id,
+                    type: "DELETE",
+                    success: function() {
+                        loadStatus();
+                    },
+                    error: function() {
+                        alert("Failed to delete device");
+                    }
+                });
+            });
+        });
+
+        // Import CSV
+        $("#btnImportCSV").click(function() {
+            $("#csvFileInput").trigger("click");
+        });
+
+        $("#csvFileInput").on("change", function() {
+            const file = this.files[0];
+            if (!file) return;
+
+            const formData = new FormData();
+            formData.append("file", file);
+
+            $.ajax({
+                url: API_BASE + "/devices/import",
+                type: "POST",
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(res) {
+                    alert(`Import complete. Added: ${res.added || 0}, Updated: ${res.updated || 0}`);
+                    loadStatus();
+                },
+                error: function(xhr) {
+                    const msg = xhr.responseJSON?.error || "Import failed";
+                    alert(msg);
+                }
+            });
+
+            $(this).val("");
+        });
+
+        // Export buttons (update existing and add new ones)
+// Modern download approach using fetch
+async function downloadFileBlob(url, filename) {
+    try {
+        const response = await fetch(url);
+        const blob = await response.blob();
+        const downloadUrl = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = downloadUrl;
+        a.download = filename || 'download';
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(downloadUrl);
+        document.body.removeChild(a);
+    } catch (error) {
+        console.error('Download failed:', error);
+        alert('Download failed. Please try again.');
+    }
+}
+
+$("#btnExportCSV").click(function() {
+    downloadFileBlob(API_BASE + "/devices/export", "devices.csv");
+});
+
+$("#btnExportExcel").click(function() {
+    downloadFileBlob(API_BASE + "/devices/export_excel", "devices.xlsx");
+});
+
+$("#btnExportExcelOnline").click(function() {
+    downloadFileBlob(API_BASE + "/devices/export_excel_online", "online_devices.xlsx");
+});
+
+$("#btnExportExcelOffline").click(function() {
+    downloadFileBlob(API_BASE + "/devices/export_excel_offline", "offline_devices.xlsx");
+
+
+		
+
+        });
+
+
+        // Email Config
+        $("#btnEmailConfig").click(function() {
+            $.getJSON(API_BASE + "/email/config", function(config) {
+                $("#emailEnabled").prop("checked", config.enabled == 1);
+                $("#emailSmtpServer").val(config.smtp_server || "smtp.gmail.com");
+                $("#emailSmtpPort").val(config.smtp_port || 587);
+                $("#emailUsername").val(config.username || "");
+                $("#emailPassword").val(config.password || "");
+                $("#emailFrom").val(config.from_email || "");
+                $("#emailTo").val(config.to_email || "");
+                new bootstrap.Modal($("#emailConfigModal")).show();
+            });
+        });
+
+        $("#btnSaveEmailConfig").click(function() {
+            const config = {
+                enabled: $("#emailEnabled").is(":checked"),
+                smtp_server: $("#emailSmtpServer").val().trim(),
+                smtp_port: parseInt($("#emailSmtpPort").val()),
+                username: $("#emailUsername").val().trim(),
+                password: $("#emailPassword").val(),
+                from_email: $("#emailFrom").val().trim(),
+                to_email: $("#emailTo").val().trim()
+            };
+
+            $.ajax({
+                url: API_BASE + "/email/config",
+                type: "POST",
+                contentType: "application/json",
+                data: JSON.stringify(config),
+                success: function() {
+                    alert("Email configuration saved successfully!");
+                    bootstrap.Modal.getInstance($("#emailConfigModal")).hide();
+                },
+                error: function() {
+                    alert("Failed to save email configuration");
+                }
+            });
+        });
+    });
+
+
+
+    </script>
+</body>
+</html>
